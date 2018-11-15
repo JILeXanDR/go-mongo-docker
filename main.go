@@ -8,15 +8,32 @@ import (
 	"os"
 	"time"
 
-	"github.com/rs/cors"
-
 	"github.com/gorilla/mux"
-	"gopkg.in/mgo.v2"
+	"github.com/globalsign/mgo"
 )
 
+type Metadata interface {
+	GetType() string
+	GetData() interface{}
+}
+
+type AnyMetadata struct {
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
+}
+
+func (d AnyMetadata) GetType() string {
+	return d.Type
+}
+
+func (d AnyMetadata) GetData() interface{} {
+	return d.Data
+}
+
 type Post struct {
-	Text      string    `json:"text" bson:"text"`
-	CreatedAt time.Time `json:"createdAt" bson:"created_at"`
+	Text      string        `json:"text" bson:"text"`
+	CreatedAt time.Time     `json:"createdAt" bson:"created_at"`
+	Metadata  []AnyMetadata `json:"metadata"`
 }
 
 var posts *mgo.Collection
@@ -42,7 +59,7 @@ func main() {
 	r.HandleFunc("/posts", readPosts).
 		Methods("GET")
 
-	http.ListenAndServe(":8080", cors.AllowAll().Handler(r))
+	http.ListenAndServe(":8080", r)
 	log.Println("Listening on port 8080...")
 }
 
@@ -74,7 +91,7 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 
 func readPosts(w http.ResponseWriter, r *http.Request) {
 	result := []Post{}
-	if err := posts.Find(nil).Sort("-created_at").All(&result); err != nil {
+	if err := posts.Find(nil).Sort("created_at").All(&result); err != nil {
 		responseError(w, err.Error(), http.StatusInternalServerError)
 	} else {
 		responseJSON(w, result)
